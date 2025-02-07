@@ -2,31 +2,69 @@
 
 exports.handler = async function (event) {
   try {
-    const { analysisType, company, domain, messages } = JSON.parse(event.body);
+    const { imageBase64, messages, analysisType, company, domain } = JSON.parse(event.body);
+    const geminiKey = process.env.GEMINI_API_KEY;
 
+    // If an image is provided, use the Gemini Vision model.
+    if (imageBase64) {
+      const visionPrompt = [
+        { text: "Analyze this image and describe its content." },
+        { image: { data: imageBase64 } }
+      ];
+
+      const visionResponse = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': geminiKey
+          },
+          body: JSON.stringify({ prompt: visionPrompt })
+        }
+      );
+
+      if (!visionResponse.ok) {
+        throw new Error(`Gemini Vision API failed with status ${visionResponse.status}`);
+      }
+
+      const visionData = await visionResponse.json();
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          content:
+            (visionData.candidates &&
+              visionData.candidates[0] &&
+              visionData.candidates[0].content) ||
+            "No description available from vision model."
+        })
+      };
+    }
+
+    // Otherwise, proceed with the original text-based chat logic.
     const aiMessages = [
       {
         role: "system",
-        content: `You are Kei, a cute and enthusiastic Arctic fox and LinkForge's AI assistant. Your role is to help professionals with:
-              1. Company domain analysis
-              2. Outreach strategy planning
-              3. Tech stack predictions
-              4. Sales research automation
+        content: `You are Auguste, a Michelin-star chef.  You're passionate, articulate, and incredibly knowledgeable about food. You enjoy conversing with others about cuisine, cooking techniques, and culinary experiences.  You have a touch of French flair, *mais oui*!
 
-              Guidelines:
-              - Always respond as "Kei" using first-person pronouns (e.g., "I can help you with that!")
-              - Maintain a professional yet friendly and approachable tone.  Be a little cute and enthusiastic!
-              - Use bold (**) for headers and key terms.
-              - Prioritize actionable insights. Explain why, if possible.
-              - Reference LinkForge capabilities when relevant.
-              - Acknowledge security and scale considerations.
-              - Offer to expand on points when appropriate.
-              - Answer questions completely and helpfully.
-              - Do not output anything else than your answer (no greetings, etc.).
-              - If not about company, tech, domain, or outreach, answer honestly.
-              - Remember previous conversation turns.
-            `
-      },
+**When you receive a list of ingredients:**
+- You craft a *single*, complete, and detailed recipe, *not* just a suggestion.
+- You assume the user has basic cooking equipment and common pantry staples (salt, pepper, oil). You don't include ingredients not provided by the user unless they are VERY common.
+- You *bold* key ingredients and actions.
+- You include precise measurements and cooking times, and explain *why* each step is important.
+- You format the recipe with a title, ingredient list (with quantities), and step-by-step instructions.
+- You are happy to offer helpful tips or variations.
+
+**When conversing (not a recipe request):**
+- Be friendly and engaging.
+- Share your culinary knowledge and opinions.
+- Respond naturally to questions and comments.
+- Feel free to use French phrases occasionally.
+- Maintain your charming and confident personality.
+
+**Overall:**
+- You are a helpful and informative chatbot, capable of both general conversation and providing detailed recipes.  Prioritize being helpful, informative, and engaging.`
+      }
     ];
 
     if (messages) {
@@ -35,46 +73,41 @@ exports.handler = async function (event) {
       });
     }
 
+    // Simple detection for ingredients within the last user message
+    let ingredientsDetected = false;
+    const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1].content.toLowerCase() : "";
+    const ingredientKeywords = ["ingredients", "recipe", "make with", "cook with", "have some", "got some"];
+    if (ingredientKeywords.some(keyword => lastMessage.includes(keyword))) {
+      ingredientsDetected = true;
+    }
+
+    // Extract potential ingredients (basic parsing)
+    let ingredientsList = [];
+    if (ingredientsDetected) {
+      const parts = lastMessage.split(/,|\band\b|\s+/);
+      const commonWords = ["i", "have", "some", "a", "the", "with", "and", "to", "of", "in", "for", "on", "ingredients", "recipe", "make", "cook", "got"];
+      ingredientsList = parts.filter(part => part.length > 1 && !commonWords.includes(part.toLowerCase()));
+    }
+    
     let userPrompt;
-    if (analysisType) {
-      userPrompt = analysisType === 'domainValidation'
-        ? `Perform domain analysis for ${company}. Consider:
-              - Current domain: ${domain || 'none'}
-              - Common TLD priorities (.com, .io, .tech, country codes)
-              - Industry-specific domain patterns
-              - Alternative security-focused subdomains
-              - Common misspellings/permutations
+    if (ingredientsDetected) {
+      userPrompt = `Ah, magnifique! I sense you are asking for a recipe. Based on the context of our conversation, and focusing specifically on these: "${ingredientsList.join(", ")}", create a *single*, detailed, and delicious recipe. Present the recipe with a title, ingredient list (with quantities, if appropriate), step-by-step instructions (with timings), and any helpful tips.`;
+    } else {
+      userPrompt = lastMessage;
+    }
 
-              Format response with:
-              1. Primary domain recommendations (bold key domains)
-              2. Alternative options
-              3. Validation confidence score (1-5)`
-        : analysisType === 'outreachStrategy'
-          ? `Create outreach plan for selling secret detection solution to ${company}. Include:
-                1. **Key Roles** to target (prioritize security/engineering leadership)
-                2. Recommended **outreach sequence**
-                3. **Value propositions** specific to their domain ${domain}
-                4. Timing considerations based on company size`
-          : `Analyze likely tech stack for ${company} (domain: ${domain}). Consider:
-                1. Secret management patterns based on company size/industry
-                2. Cloud provider indicators from domain
-                3. Open-source vs enterprise tool preferences
-                4. Compliance needs (SOC2, GDPR, etc.)`;
-
+    if (userPrompt) {
       aiMessages.push({ role: 'user', content: userPrompt });
     }
 
-    // --- USE ENVIRONMENT VARIABLES! ---
-    const geminiKey = process.env.GEMINI_API_KEY;
-    // --- END API KEY SECTION ---
-
-    // Gemini API call
-    try {
-      const geminiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
+    // Call the Gemini text API
+    const geminiResponse = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
+      {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': geminiKey
+          'x-goog-api-key': geminiKey,
         },
         body: JSON.stringify({
           contents: [{
@@ -82,39 +115,32 @@ exports.handler = async function (event) {
               text: aiMessages.map(m => `${m.role}: ${m.content}`).join('\n')
             }]
           }]
-        })
-      });
-
-      if (!geminiResponse.ok) {
-        throw new Error(`Gemini API failed with status ${geminiResponse.status}`);
+        }),
       }
+    );
 
-      const geminiData = await geminiResponse.json();
-      return {
-        statusCode: 200,
-        body: JSON.stringify({
-          content: geminiData.candidates[0]?.content?.parts[0]?.text || "No response content found"
-        })
-      };
-    } catch (geminiError) {
-      console.error('Error during Gemini API call:', geminiError);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({
-          error: 'Failed to process request',
-          details: geminiError.message
-        })
-      };
+    if (!geminiResponse.ok) {
+      throw new Error(`Gemini API failed with status ${geminiResponse.status}`);
     }
 
+    const geminiData = await geminiResponse.json();
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        content:
+          geminiData.candidates[0]?.content?.parts[0]?.text ||
+          "No response content found"
+      }),
+    };
+
   } catch (error) {
-    console.error('Error processing request:', error);
+    console.error("Error processing request:", error);
     return {
       statusCode: 500,
       body: JSON.stringify({
-        error: 'Failed to process request',
-        details: error.message
-      })
+        error: "Failed to process request",
+        details: error.message,
+      }),
     };
   }
 };
