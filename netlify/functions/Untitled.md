@@ -2,7 +2,7 @@
 
 ## Project Statistics
 
-- Total files: 13
+- Total files: 12
 
 ## Folder Structure
 
@@ -13,15 +13,14 @@ index.html
 netlify
   functions
     ai-chat.js
-    api.ts
     moondream-analysis.js
+    process-request.js
 netlify.toml
 package.json
 src
   AIChatAssistant.jsx
-  deepchef.tsx
+  deepchef.jsx
   main.jsx
-vite-env.d.ts
 vite.config.js
 
 ```
@@ -206,199 +205,6 @@ exports.handler = async function (event) {
 };
 ```
 
-### netlify/functions/api.ts
-
-```ts
-import axios from "axios";
-
-const MOONDREAM_API_KEY = import.meta.env.VITE_MOONDREAM_API_KEY;
-const RECIPE_API_KEY = import.meta.env.VITE_SPOONACULAR_API_KEY;
-const MOONDREAM_API_URL = "https://api.moondream.ai/v1/query";
-const RECIPE_API_URL = "https://api.spoonacular.com/recipes/findByIngredients";
-
-/**
- * Processes the user request.
- * If an image file is provided, uses Moondream to extract ingredients.
- * Otherwise, checks the messages for ingredient keywords and extracts ingredients from text.
- * Then, calls Spoonacular to fetch a recipe.
- */
-export async function processUserRequest(params: {
-  imageFile?: File;
-  messages?: { type: string; content: string }[];
-}): Promise<any> {
-  try {
-    // ----- IMAGE-BASED FLOW -----
-    if (params.imageFile) {
-      // Convert the image to Base64 and identify ingredients
-      const ingredients = await identifyIngredients(params.imageFile);
-      if (ingredients.length === 0) {
-        return { content: "No ingredients found in the image." };
-      }
-      const recipes = await fetchRecipes(ingredients);
-      if (recipes.length === 0) {
-        return { content: "No recipes found from the identified ingredients." };
-      }
-      return { ingredients, recipes };
-    }
-    
-    // ----- TEXT-BASED FLOW -----
-    else if (params.messages && params.messages.length > 0) {
-      const lastMessage = params.messages[params.messages.length - 1].content.toLowerCase();
-      // Look for keywords that would indicate the user is asking for a recipe.
-      const ingredientKeywords = ["ingredients", "recipe", "make with", "cook with", "have some", "got some"];
-      const ingredientsDetected = ingredientKeywords.some(keyword => lastMessage.includes(keyword));
-      
-      let ingredientsList: string[] = [];
-      if (ingredientsDetected) {
-        // Split on commas, the word "and", or whitespace and filter out common words.
-        const parts = lastMessage.split(/,|\band\b|\s+/);
-        const commonWords = [
-          "i", "have", "some", "a", "the", "with", "and", "to", "of", "in",
-          "for", "on", "ingredients", "recipe", "make", "cook", "got"
-        ];
-        ingredientsList = parts.filter(
-          part => part.length > 1 && !commonWords.includes(part.toLowerCase())
-        );
-      }
-      
-      if (ingredientsList.length === 0) {
-        return { content: "No ingredients detected in your message." };
-      }
-      
-      const recipes = await fetchRecipes(ingredientsList);
-      if (recipes.length === 0) {
-        return { content: "No recipes found based on your ingredients." };
-      }
-      
-      return { ingredients: ingredientsList, recipes };
-    }
-    
-    // ----- NO VALID INPUT -----
-    else {
-      return { content: "No valid input provided. Please supply an image file or a message." };
-    }
-  } catch (error: any) {
-    console.error("Error processing user request:", error);
-    return { error: "Failed to process request: " + error.message };
-  }
-}
-
-/**
- * Given an image file, converts it to Base64 and calls the Moondream API
- * to extract a comma‐separated list of ingredients.
- */
-export async function identifyIngredients(imageFile: File): Promise<string[]> {
-  if (!MOONDREAM_API_KEY) {
-    throw new Error("⚠️ Moondream API Key is missing. Check your .env file.");
-  }
-
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onloadend = async () => {
-      const base64Image = reader.result?.toString();
-      if (!base64Image) {
-        reject(new Error("⚠️ Error converting image to Base64."));
-        return;
-      }
-      
-      try {
-        const response = await axios.post(
-          MOONDREAM_API_URL,
-          {
-            image_url: base64Image,
-            question: "Ingredients in this image separated by commas",
-            stream: false,
-          },
-          {
-            headers: {
-              "X-Moondream-Auth": MOONDREAM_API_KEY,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        
-        // Check for a successful response.
-        if (response.status === 200 && response.data) {
-          let answer: string | undefined;
-          // Try common fields to locate the answer.
-          if (response.data.response) {
-            answer = response.data.response;
-          } else if (response.data.text) {
-            answer = response.data.text;
-          } else if (response.data.answer) {
-            answer = response.data.answer;
-          } else if (Array.isArray(response.data) && response.data[0]?.response) {
-            answer = response.data[0].response;
-          } else if (Array.isArray(response.data) && response.data[0]?.text) {
-            answer = response.data[0].text;
-          }
-          
-          if (answer && answer.trim() !== "") {
-            const ingredients = answer.split(",").map((i: string) => i.trim()).filter(Boolean);
-            resolve(ingredients);
-          } else {
-            // No answer found or only empty string returned.
-            resolve([]);
-          }
-        } else {
-          reject(new Error("⚠️ Unexpected response from Moondream API."));
-        }
-      } catch (error: any) {
-        // Detailed error handling mimicking the original logic.
-        if (axios.isAxiosError(error)) {
-          if (error.response) {
-            const status = error.response.status;
-            if (status === 401) {
-              reject(new Error("⚠️ Unauthorized. Check your Moondream API key."));
-            } else if (status === 429) {
-              reject(new Error("⚠️ Too many requests. Try again later."));
-            } else if (status === 503) {
-              reject(new Error("⚠️ Moondream API is temporarily unavailable. Try again later."));
-            } else {
-              reject(new Error(`⚠️ Moondream API Error: ${status} - ${error.response.statusText}`));
-            }
-          } else if (error.request) {
-            reject(new Error("⚠️ Moondream API did not respond. Check your network connection."));
-          } else {
-            reject(new Error("⚠️ An error occurred setting up the request."));
-          }
-        } else {
-          reject(new Error("⚠️ An unexpected error occurred."));
-        }
-      }
-    };
-
-    reader.onerror = () => reject(new Error("⚠️ Error reading image file."));
-    reader.readAsDataURL(imageFile);
-  });
-}
-
-/**
- * Given a list of ingredients, uses the Spoonacular API to fetch recipes.
- */
-export async function fetchRecipes(ingredients: string[]): Promise<any[]> {
-  if (!RECIPE_API_KEY) {
-    throw new Error("⚠️ Spoonacular API Key is missing. Check your .env file.");
-  }
-
-  try {
-    const response = await axios.get(RECIPE_API_URL, {
-      params: {
-        ingredients: ingredients.join(","),
-        number: 5,
-        apiKey: RECIPE_API_KEY,
-      },
-    });
-    return response.data || [];
-  } catch (error: any) {
-    console.error("Error fetching recipes:", error);
-    return [];
-  }
-}
-
-```
-
 ### netlify/functions/moondream-analysis.js
 
 ```js
@@ -446,6 +252,166 @@ exports.handler = async function (event) {
     }
   };
   
+```
+
+### netlify/functions/process-request.js
+
+```js
+// netlify/functions/process-request.js
+const MOONDREAM_API_KEY = process.env.MOONDREAM_API_KEY;
+const RECIPE_API_KEY = process.env.SPOONACULAR_API_KEY;
+const MOONDREAM_API_URL = "https://api.moondream.ai/v1/query";
+const RECIPE_API_URL = "https://api.spoonacular.com/recipes/findByIngredients";
+
+// To convert this to a background function (with longer timeout), 
+// rename the file to include "-background.js"
+
+exports.handler = async function(event) {
+  try {
+    const { imageFile, messages } = JSON.parse(event.body);
+    let ingredients = [];
+
+    // Image-based flow: Extract ingredients from an image
+    if (imageFile) {
+      ingredients = await identifyIngredients(imageFile);
+      if (ingredients.length === 0) {
+        return {
+          statusCode: 200,
+          body: JSON.stringify({ content: "No ingredients found in the image." })
+        };
+      }
+    }
+    // Text-based flow: Extract ingredients via simple text parsing
+    else if (messages && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1].content.toLowerCase();
+      const ingredientKeywords = ["ingredients", "recipe", "make with", "cook with", "have some", "got some"];
+      const ingredientsDetected = ingredientKeywords.some(keyword => lastMessage.includes(keyword));
+
+      if (ingredientsDetected) {
+        const parts = lastMessage.split(/,|\band\b|\s+/);
+        const commonWords = [
+          "i", "have", "some", "a", "the", "with", "and", "to", "of", "in",
+          "for", "on", "ingredients", "recipe", "make", "cook", "got"
+        ];
+        ingredients = parts.filter(part => part.length > 1 && !commonWords.includes(part.toLowerCase()));
+      }
+
+      if (ingredients.length === 0) {
+        return {
+          statusCode: 200,
+          body: JSON.stringify({ content: "No ingredients detected in your message." })
+        };
+      }
+    }
+    else {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "Invalid request: No imageFile or messages provided." })
+      };
+    }
+
+    // Fetch recipes based on the detected ingredients
+    const recipes = await fetchRecipes(ingredients);
+    if (recipes.length === 0) {
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ content: "No recipes found based on your ingredients." })
+      };
+    }
+    
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ ingredients, recipes })
+    };
+
+  } catch (error) {
+    console.error("Error processing request:", error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Failed to process request: " + error.message })
+    };
+  }
+};
+
+// Helper function to retry API requests with exponential backoff
+async function retryRequest(fn, retries = 3, delay = 1000) {
+  try {
+    return await fn();
+  } catch (error) {
+    if (retries > 0) {
+      console.log(`Retrying request, attempts left: ${retries}`);
+      await new Promise(res => setTimeout(res, delay));
+      return retryRequest(fn, retries - 1, delay * 2);
+    }
+    throw error;
+  }
+}
+
+async function identifyIngredients(imageBase64) {
+  if (!MOONDREAM_API_KEY) {
+    throw new Error("⚠️ Moondream API Key is missing");
+  }
+
+  const requestOptions = {
+    image_url: `data:image/jpeg;base64,${imageBase64}`,
+    question: "Ingredients in this image separated by commas",
+    stream: false,
+  };
+
+  try {
+    const response = await retryRequest(() =>
+      fetch(MOONDREAM_API_URL, {
+        method: "POST",
+        headers: {
+          "X-Moondream-Auth": MOONDREAM_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestOptions),
+      })
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      let answer;
+      if (data.response) answer = data.response;
+      else if (data.text) answer = data.text;
+      else if (data.answer) answer = data.answer;
+      else if (Array.isArray(data) && data[0]?.response) answer = data[0].response;
+      else if (Array.isArray(data) && data[0]?.text) answer = data[0].text;
+
+      if (answer && answer.trim() !== "") {
+        return answer.split(",").map(i => i.trim()).filter(Boolean);
+      }
+    }
+    return [];
+  } catch (error) {
+    console.error("Error identifying ingredients:", error);
+    throw error;
+  }
+}
+
+async function fetchRecipes(ingredients) {
+  if (!RECIPE_API_KEY) {
+    throw new Error("⚠️ Spoonacular API Key is missing");
+  }
+
+  try {
+    const url = new URL(RECIPE_API_URL);
+    url.searchParams.set("ingredients", ingredients.join(","));
+    url.searchParams.set("number", "5");
+    url.searchParams.set("apiKey", RECIPE_API_KEY);
+
+    const response = await retryRequest(() => fetch(url));
+    if (response.ok) {
+      return await response.json();
+    }
+    return [];
+  } catch (error) {
+    console.error("Error fetching recipes:", error);
+    return [];
+  }
+}
+
 ```
 
 ### netlify.toml
@@ -778,10 +744,278 @@ export default AIChatAssistant;
 
 ```
 
-### src/deepchef.tsx
+### src/deepchef.jsx
 
-```tsx
+```jsx
+import React, { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Camera, Loader2, X, Send, Utensils } from 'lucide-react';
 
+const DeepChef = () => {
+  const [isOpen, setIsOpen] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [ingredients, setIngredients] = useState([]);
+  const [recipes, setRecipes] = useState([]);
+  const [error, setError] = useState('');
+  const [currentMessage, setCurrentMessage] = useState('');
+  const fileInputRef = useRef(null);
+
+  const handleImageUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const processUserRequest = async (params) => {
+    // If we have an image file, convert it to base64 first
+    if (params.imageFile) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          try {
+            const base64Data = reader.result.split(',')[1]; // Remove data URL prefix
+            const response = await fetch('/.netlify/functions/process-request', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                ...params,
+                imageFile: base64Data,
+              }),
+            });
+            const data = await response.json();
+            resolve(data);
+          } catch (error) {
+            reject(error);
+          }
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(params.imageFile);
+      });
+    } else {
+      // Handle text-based requests
+      const response = await fetch('/.netlify/functions/process-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+      });
+      return await response.json();
+    }
+  };
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const requestData = {};
+      if (imageFile) {
+        requestData.imageFile = imageFile;
+      } else if (currentMessage) {
+        requestData.messages = [{
+          type: 'user',
+          content: currentMessage
+        }];
+      }
+
+      const response = await processUserRequest(requestData);
+
+      if (response.error) {
+        setError(response.error);
+      } else {
+        if (response.ingredients) {
+          setIngredients(response.ingredients);
+        }
+        if (response.recipes) {
+          setRecipes(response.recipes);
+        }
+        setCurrentMessage('');
+        setImageFile(null);
+        setImagePreview('');
+      }
+    } catch (err) {
+      setError('Failed to process request. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearAll = () => {
+    setImageFile(null);
+    setImagePreview('');
+    setIngredients([]);
+    setRecipes([]);
+    setError('');
+    setCurrentMessage('');
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      className="border rounded-xl bg-white shadow-lg mt-6"
+    >
+      <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center gap-2">
+          <span className="text-blue-600 text-xl">🧑‍🍳</span>
+          <h3 className="font-semibold">DeepChef</h3>
+        </div>
+        <button 
+          onClick={() => setIsOpen(!isOpen)} 
+          className="p-1 hover:bg-gray-100 rounded-lg"
+        >
+          <X className="w-5 h-5 text-gray-500" />
+        </button>
+      </div>
+
+      {isOpen && (
+        <div className="h-96 flex flex-col">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex flex-col gap-4">
+              {/* Image Upload Section */}
+              <div className="flex flex-col items-center gap-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                >
+                  <Camera className="w-4 h-4" />
+                  Upload Food Image
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+              </div>
+
+              {/* Image Preview */}
+              {imagePreview && (
+                <div className="relative w-full flex justify-center">
+                  <img
+                    src={imagePreview}
+                    alt="Food Preview"
+                    className="max-h-48 rounded-lg"
+                  />
+                  <button
+                    onClick={() => {
+                      setImagePreview('');
+                      setImageFile(null);
+                    }}
+                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Text Input */}
+              <div className="flex gap-2">
+                <textarea
+                  value={currentMessage}
+                  onChange={(e) => setCurrentMessage(e.target.value)}
+                  placeholder="Or type your ingredients here..."
+                  className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none h-12 overflow-hidden"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit();
+                    }
+                  }}
+                />
+                <motion.button
+                  onClick={handleSubmit}
+                  disabled={loading || (!imageFile && !currentMessage)}
+                  className="p-3 bg-blue-500 rounded-lg text-white shadow-md hover:bg-blue-600 transition-colors disabled:opacity-50"
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {loading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Send className="w-5 h-5" />
+                  )}
+                </motion.button>
+              </div>
+
+              {/* Results Section */}
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="p-4 bg-red-50 text-red-600 rounded-lg"
+                  >
+                    {error}
+                  </motion.div>
+                )}
+
+                {ingredients.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="p-4 bg-gray-50 rounded-lg"
+                  >
+                    <h4 className="font-semibold mb-2">Detected Ingredients:</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {ingredients.map((ingredient, index) => (
+                        <span
+                          key={index}
+                          className="px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-sm"
+                        >
+                          {ingredient}
+                        </span>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
+                {recipes.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="space-y-4"
+                  >
+                    <h4 className="font-semibold">Suggested Recipes:</h4>
+                    {recipes.map((recipe, index) => (
+                      <div
+                        key={index}
+                        className="p-4 bg-gray-50 rounded-lg flex items-center gap-4"
+                      >
+                        <Utensils className="w-6 h-6 text-blue-500" />
+                        <div>
+                          <h5 className="font-medium">{recipe.title}</h5>
+                          {recipe.missedIngredientCount > 0 && (
+                            <p className="text-sm text-gray-500">
+                              Missing {recipe.missedIngredientCount} ingredients
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+export default DeepChef;
 ```
 
 ### src/main.jsx
@@ -791,31 +1025,35 @@ export default AIChatAssistant;
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import AIChatAssistant from './AIChatAssistant';
+import DeepChef from './deepchef';
+
+const App = () => {
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <h1 className="text-3xl font-bold text-center mb-8">Chef GPT</h1>
+      
+      {/* Main content container */}
+      <div className="space-y-6">
+        {/* Original AIChatAssistant */}
+        <AIChatAssistant 
+          company="ExampleCorp" 
+          domain="example.com" 
+          companies={["ExampleCorp", "AnotherCorp"]} 
+        />
+        
+        {/* New DeepChef component */}
+        <DeepChef />
+      </div>
+    </div>
+  );
+};
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <AIChatAssistant company="ExampleCorp" domain="example.com" companies={["ExampleCorp", "AnotherCorp"]} />
+    <App />
   </React.StrictMode>
 );
-
-```
-
-### vite-env.d.ts
-
-```ts
-/// <reference types="vite/client" />
-
-interface ImportMetaEnv {
-    readonly VITE_MOONDREAM_API_KEY: string;
-    readonly VITE_SPOONACULAR_API_KEY: string;
-    // add any additional custom env variables here
-  }
-  
-  interface ImportMeta {
-    readonly env: ImportMetaEnv;
-  }
-  
 ```
 
 ### vite.config.js

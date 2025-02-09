@@ -1,6 +1,7 @@
+// src/deepchef.jsx
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Loader2, X, Send, Utensils } from 'lucide-react';
+import { Camera, Loader2, X, Send, Utensils, MessageSquare } from 'lucide-react';
 
 const DeepChef = () => {
   const [isOpen, setIsOpen] = useState(true);
@@ -11,6 +12,7 @@ const DeepChef = () => {
   const [recipes, setRecipes] = useState([]);
   const [error, setError] = useState('');
   const [currentMessage, setCurrentMessage] = useState('');
+  const [chefAsked, setChefAsked] = useState(false); // Track if "Ask the Chef!" has been clicked.
   const fileInputRef = useRef(null);
 
   const handleImageUpload = (event) => {
@@ -68,6 +70,7 @@ const DeepChef = () => {
   const handleSubmit = async () => {
     setLoading(true);
     setError('');
+    setChefAsked(false); // Reset when submitting a new request.
     try {
       const requestData = {};
       if (imageFile) {
@@ -108,12 +111,89 @@ const DeepChef = () => {
     setRecipes([]);
     setError('');
     setCurrentMessage('');
+    setChefAsked(false);
   };
 
+    const askChef = async (recipe) => {
+      setLoading(true);
+        try {
+            // Construct a detailed prompt for the Chef
+            let prompt = `Hey Chef, how do I cook this? Recipe Title: ${recipe.title}.\n`;
+            prompt += `I have these ingredients: ${ingredients.join(', ')}.`;
+            if (recipe.missedIngredientCount > 0) {
+                prompt += `\nI'm missing ${recipe.missedIngredientCount} ingredients.`;
+            }
+
+
+            const systemPrompt = `You are Auguste, a Michelin-star chef.  A user has requested detailed instructions for the following recipe: "${recipe.title}". They have indicated they possess the following ingredients: ${ingredients.join(', ')}.  They are missing ${recipe.missedIngredientCount} ingredients from the Spoonacular suggestion.
+
+Provide a *complete and highly detailed* recipe, formatted as follows:
+
+**Recipe Title:** [Recipe Title Here]
+
+**Ingredients:**
+* [Ingredient 1] - [Quantity] (Note if a substitute for a missing ingredient, or omit if unavailable)
+* [Ingredient 2] - [Quantity] (Note if a substitute, or omit)
+* ...
+
+**Instructions:**
+1. **Step 1:** [Detailed explanation of step 1, including cooking times, temperatures, and techniques. Explain *why* the step is important.]
+2. **Step 2:** [Detailed explanation of step 2...]
+3. ...
+
+**Tips and Variations:**
+* [Optional: Provide any helpful tips or variations based on available ingredients or common substitutions.]
+
+**Important Considerations:**
+* **Missing Ingredients:** If the user is missing key ingredients, suggest *reasonable* substitutions using common pantry items or ingredients they likely have. If a critical ingredient cannot be substituted, clearly state that the recipe may not turn out as intended, and suggest an alternative approach (e.g., making a simpler dish with available ingredients). *Do not* include ingredients the user stated they don't have unless it is a VERY common staple (salt, pepper, oil).
+* **Clarity and Precision:**  Provide very clear and precise instructions, suitable for someone who may not be an experienced cook.  Include cooking times, temperatures, and describe techniques.
+* **Ingredient Quantities:**  Use standard measurements (e.g., cups, tablespoons, teaspoons, ounces, grams). Be as precise as possible, but use your judgment based on the ingredients provided.
+* **French Flair:**  Maintain your persona as Auguste, a Michelin-star chef. Add a touch of French flair, *mais oui*!  Be enthusiastic and helpful.
+* **Completeness:** The final output should be a single, self-contained recipe. Do not offer multiple options or incomplete instructions.
+`;
+        const aiMessages = [
+              { role: "system", content: systemPrompt },
+              { role: 'user', content: prompt }
+        ];
+
+
+            const response = await fetch('/.netlify/functions/ai-chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: aiMessages })
+            });
+
+            if (!response.ok) throw new Error('API request failed');
+
+            const data = await response.json();
+            const aiResponse = `${data.content}\n\n_— ChefGPT_`;
+
+          // Create a new recipe object combining the original Spoonacular data and the AI response
+            const detailedRecipe = {
+                ...recipe,
+                detailedInstructions: aiResponse
+            };
+
+
+        // Update the recipes state with the detailed recipe
+        setRecipes(prevRecipes =>
+          prevRecipes.map(r => (r.id === recipe.id ? detailedRecipe : r))
+        );
+        setChefAsked(true); // Set to true after successfully asking the chef.
+
+        } catch (error) {
+            setError("⚠️ Hmm, I'm having trouble connecting. Please try again later!");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
+
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }} 
-      animate={{ opacity: 1, y: 0 }} 
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
       className="border rounded-xl bg-white shadow-lg mt-6"
     >
       <div className="flex items-center justify-between p-4 border-b">
@@ -121,8 +201,8 @@ const DeepChef = () => {
           <span className="text-blue-600 text-xl">🧑‍🍳</span>
           <h3 className="font-semibold">DeepChef</h3>
         </div>
-        <button 
-          onClick={() => setIsOpen(!isOpen)} 
+        <button
+          onClick={() => setIsOpen(!isOpen)}
           className="p-1 hover:bg-gray-100 rounded-lg"
         >
           <X className="w-5 h-5 text-gray-500" />
@@ -242,17 +322,49 @@ const DeepChef = () => {
                     {recipes.map((recipe, index) => (
                       <div
                         key={index}
-                        className="p-4 bg-gray-50 rounded-lg flex items-center gap-4"
+                        className="p-4 bg-gray-50 rounded-lg"
                       >
-                        <Utensils className="w-6 h-6 text-blue-500" />
-                        <div>
-                          <h5 className="font-medium">{recipe.title}</h5>
-                          {recipe.missedIngredientCount > 0 && (
-                            <p className="text-sm text-gray-500">
-                              Missing {recipe.missedIngredientCount} ingredients
-                            </p>
-                          )}
+                        <div className="flex items-center gap-4">
+                          <Utensils className="w-6 h-6 text-blue-500" />
+                          <div>
+                            <h5 className="font-medium">{recipe.title}</h5>
+                            {recipe.missedIngredientCount > 0 && (
+                              <p className="text-sm text-gray-500">
+                                Missing {recipe.missedIngredientCount} ingredients
+                              </p>
+                            )}
+                           </div>
+                          {!recipe.detailedInstructions && ( // Only show if we don't have details yet
+                                                        <button
+                                                            onClick={() => askChef(recipe)}
+                                                            className="ml-auto flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
+                                                            disabled={loading}
+                                                        >
+                                                            {loading ? (
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                            ) : (
+                                                              <>
+                                                                 <MessageSquare className="w-4 h-4" />
+                                                                    Ask the Chef!
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                        )}
                         </div>
+
+                         {/* Display detailed instructions if available */}
+                        {recipe.detailedInstructions && (
+                                                    <div className="mt-4">
+                                                        <p className="whitespace-pre-wrap text-gray-700">
+                                                          {recipe.detailedInstructions.split(/(\*\*.*?\*\*)/g).map((part, index) =>
+                                                              part.startsWith('**') && part.endsWith('**')
+                                                                ? (<strong key={index} className="font-semibold">{part.slice(2, -2)}</strong>)
+                                                                : (<span key={index}>{part}</span>)
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                )}
+
                       </div>
                     ))}
                   </motion.div>
