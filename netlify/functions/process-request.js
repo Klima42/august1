@@ -1,18 +1,18 @@
-import axios from "axios";
-
+// netlify/functions/process-request.js
 const MOONDREAM_API_KEY = process.env.MOONDREAM_API_KEY;
 const RECIPE_API_KEY = process.env.SPOONACULAR_API_KEY;
 const MOONDREAM_API_URL = "https://api.moondream.ai/v1/query";
 const RECIPE_API_URL = "https://api.spoonacular.com/recipes/findByIngredients";
 
-// To use this function as a Netlify background function, rename the file to end with "-background.js"
+// To convert this to a background function (with longer timeout), 
+// rename the file to include "-background.js"
 
 exports.handler = async function(event) {
   try {
     const { imageFile, messages } = JSON.parse(event.body);
     let ingredients = [];
 
-    // If an imageFile is provided, try to extract ingredients using the Moondream API
+    // Image-based flow: Extract ingredients from an image
     if (imageFile) {
       ingredients = await identifyIngredients(imageFile);
       if (ingredients.length === 0) {
@@ -22,7 +22,7 @@ exports.handler = async function(event) {
         };
       }
     }
-    // If messages are provided, use simple text parsing to extract ingredient keywords
+    // Text-based flow: Extract ingredients via simple text parsing
     else if (messages && messages.length > 0) {
       const lastMessage = messages[messages.length - 1].content.toLowerCase();
       const ingredientKeywords = ["ingredients", "recipe", "make with", "cook with", "have some", "got some"];
@@ -30,11 +30,11 @@ exports.handler = async function(event) {
 
       if (ingredientsDetected) {
         const parts = lastMessage.split(/,|\band\b|\s+/);
-        // Common words to filter out from the detected ingredients
-        const commonWords = ["i", "have", "some", "a", "the", "with", "and", "to", "of", "in", "for", "on", "ingredients", "recipe", "make", "cook", "got"];
-        ingredients = parts.filter(
-          part => part.length > 1 && !commonWords.includes(part.toLowerCase())
-        );
+        const commonWords = [
+          "i", "have", "some", "a", "the", "with", "and", "to", "of", "in",
+          "for", "on", "ingredients", "recipe", "make", "cook", "got"
+        ];
+        ingredients = parts.filter(part => part.length > 1 && !commonWords.includes(part.toLowerCase()));
       }
 
       if (ingredients.length === 0) {
@@ -43,7 +43,8 @@ exports.handler = async function(event) {
           body: JSON.stringify({ content: "No ingredients detected in your message." })
         };
       }
-    } else {
+    }
+    else {
       return {
         statusCode: 400,
         body: JSON.stringify({ error: "Invalid request: No imageFile or messages provided." })
@@ -73,7 +74,7 @@ exports.handler = async function(event) {
   }
 };
 
-// A helper function to retry API requests (with exponential backoff)
+// Helper function to retry API requests with exponential backoff
 async function retryRequest(fn, retries = 3, delay = 1000) {
   try {
     return await fn();
@@ -100,21 +101,24 @@ async function identifyIngredients(imageBase64) {
 
   try {
     const response = await retryRequest(() =>
-      axios.post(MOONDREAM_API_URL, requestOptions, {
+      fetch(MOONDREAM_API_URL, {
+        method: "POST",
         headers: {
           "X-Moondream-Auth": MOONDREAM_API_KEY,
           "Content-Type": "application/json",
         },
+        body: JSON.stringify(requestOptions),
       })
     );
 
-    if (response.status === 200 && response.data) {
+    if (response.ok) {
+      const data = await response.json();
       let answer;
-      if (response.data.response) answer = response.data.response;
-      else if (response.data.text) answer = response.data.text;
-      else if (response.data.answer) answer = response.data.answer;
-      else if (Array.isArray(response.data) && response.data[0]?.response) answer = response.data[0].response;
-      else if (Array.isArray(response.data) && response.data[0]?.text) answer = response.data[0].text;
+      if (data.response) answer = data.response;
+      else if (data.text) answer = data.text;
+      else if (data.answer) answer = data.answer;
+      else if (Array.isArray(data) && data[0]?.response) answer = data[0].response;
+      else if (Array.isArray(data) && data[0]?.text) answer = data[0].text;
 
       if (answer && answer.trim() !== "") {
         return answer.split(",").map(i => i.trim()).filter(Boolean);
@@ -133,16 +137,16 @@ async function fetchRecipes(ingredients) {
   }
 
   try {
-    const response = await retryRequest(() =>
-      axios.get(RECIPE_API_URL, {
-        params: {
-          ingredients: ingredients.join(","),
-          number: 5,
-          apiKey: RECIPE_API_KEY,
-        },
-      })
-    );
-    return response.data || [];
+    const url = new URL(RECIPE_API_URL);
+    url.searchParams.set("ingredients", ingredients.join(","));
+    url.searchParams.set("number", "5");
+    url.searchParams.set("apiKey", RECIPE_API_KEY);
+
+    const response = await retryRequest(() => fetch(url));
+    if (response.ok) {
+      return await response.json();
+    }
+    return [];
   } catch (error) {
     console.error("Error fetching recipes:", error);
     return [];
