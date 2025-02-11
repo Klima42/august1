@@ -1,13 +1,13 @@
-// src/AIChatAssistant.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, X, Send } from 'lucide-react';
+import { Loader2, X, Send, ImagePlus, XCircle } from 'lucide-react';
 
 const thinkingMessages = [
-  "Let me ponder that...", "Thinking out loud...", "Crunching the numbers...",
-  "Diving into the data...", "Consulting my algorithms...", "Let me check...",
-  "Peeking at the knowledge base...", "Just a moment...", "Whispering to the servers...",
-  "Searching my brain..."
+  "Let me cook up something special...", 
+  "Analyzing your request...", 
+  "Consulting my culinary knowledge...",
+  "Preparing your response...", 
+  "Simmering on that thought..."
 ];
 
 const AIChatAssistant = () => {
@@ -15,6 +15,11 @@ const AIChatAssistant = () => {
   const [isOpen, setIsOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [currentMessage, setCurrentMessage] = useState('');
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [imageAnalysis, setImageAnalysis] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const fileInputRef = useRef(null);
 
   const generateThinkingMessage = () =>
     thinkingMessages[Math.floor(Math.random() * thinkingMessages.length)];
@@ -25,8 +30,9 @@ const AIChatAssistant = () => {
       setMessages(JSON.parse(storedMessages));
     } else {
       setMessages([{
-        id: 'welcome', type: 'ai',
-        content: `**Hi! I'm ChefGPT** 🍽️ - Your culinary assistant\n\nI can help with creating detailed recipes and answering food-related questions. Ask me anything about ingredients or cooking techniques!`
+        id: 'welcome',
+        type: 'ai',
+        content: `**Bonjour! I'm Auguste** 🍽️ - Your culinary assistant\n\nI can help with creating detailed recipes, analyzing food photos, and answering cooking questions. Feel free to share images or ask about any culinary topic!`
       }]);
     }
   }, []);
@@ -35,100 +41,239 @@ const AIChatAssistant = () => {
     localStorage.setItem('chatHistory', JSON.stringify(messages));
   }, [messages]);
 
+  const handleImageSelect = async (e) => {
+    const file = e.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+      setIsAnalyzing(true);
+      setSelectedImage(file);
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+      
+      // Convert image to base64
+      const reader = new FileReader();
+      const imageBase64 = await new Promise((resolve) => {
+        reader.onloadend = () => {
+          const base64String = reader.result.split(',')[1];
+          resolve(base64String);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      try {
+        // Send for immediate analysis using moondream-analysis.js
+        const response = await fetch('/.netlify/functions/moondream-analysis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64 })
+        });
+
+        if (!response.ok) throw new Error('Image analysis failed');
+
+        const data = await response.json();
+        setImageAnalysis(data.caption);
+      } catch (error) {
+        console.error('Error analyzing image:', error);
+        setImageAnalysis('Failed to analyze image');
+      } finally {
+        setIsAnalyzing(false);
+      }
+    }
+  };
+
+  const clearSelectedImage = () => {
+    setSelectedImage(null);
+    setPreviewUrl('');
+    setImageAnalysis('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!currentMessage.trim()) return;
     setIsLoading(true);
-    const userMessage = { id: Date.now(), type: 'user', content: currentMessage };
+
+    // Create the user message, including image analysis if present
+    const userMessageContent = imageAnalysis 
+      ? `[Image Analysis: ${imageAnalysis}]\n\n${currentMessage}`
+      : currentMessage;
+
+    const userMessage = {
+      id: Date.now(),
+      type: 'user',
+      content: userMessageContent,
+      hasImage: !!selectedImage
+    };
+
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
 
     try {
+      // Send chat message to ai-chat.js
       const response = await fetch('/.netlify/functions/ai-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updatedMessages })
+        body: JSON.stringify({
+          messages: updatedMessages
+        })
       });
 
-      if (!response.ok) throw new Error('API request failed');
+      if (!response.ok) throw new Error('Chat request failed');
 
       const data = await response.json();
-      const aiResponse = `${data.content}\n\n_— ChefGPT_`;
-      setMessages(prev => [...prev, { id: Date.now() + 1, type: 'ai', content: aiResponse }]);
+      const aiResponse = `${data.content}\n\n_— Auguste_`;
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        type: 'ai',
+        content: aiResponse
+      }]);
     } catch (error) {
-      setMessages(prev => [...prev, { id: Date.now(), type: 'ai', content: "⚠️ Hmm, I'm having trouble connecting. Please try again later!", isError: true }]);
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        type: 'ai',
+        content: "⚠️ Mon dieu! I'm having trouble connecting. Please try again later!",
+        isError: true
+      }]);
     } finally {
       setIsLoading(false);
       setCurrentMessage('');
+      clearSelectedImage();
     }
   };
+
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="border rounded-xl bg-white shadow-lg mt-6">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      className="border rounded-xl bg-white shadow-lg mt-6"
+    >
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center gap-2">
           <span className="text-blue-600 text-xl">🍽️</span>
-          <h3 className="font-semibold">ChefGPT</h3>
+          <h3 className="font-semibold">Auguste - Your Culinary AI</h3>
         </div>
-        <button onClick={() => setIsOpen(!isOpen)} className="p-1 hover:bg-gray-100 rounded-lg">
+        <button 
+          onClick={() => setIsOpen(!isOpen)} 
+          className="p-1 hover:bg-gray-100 rounded-lg"
+        >
           <X className="w-5 h-5 text-gray-500" />
         </button>
       </div>
 
-        <div className="h-96 flex flex-col">
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-
-                <AnimatePresence>
-                  {messages.map((message) => (
-                    <motion.div
-                      key={message.id}
-                      initial={{ opacity: 0, x: message.type === 'user' ? 20 : -20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className={`flex gap-3 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-md p-4 rounded-xl ${message.type === 'user' ? 'bg-blue-100 ml-12' : 'bg-gray-100 mr-12'} ${message.isError ? 'bg-red-50 border border-red-100' : ''}`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          {message.type === 'ai' && <span className="text-blue-600 text-lg">🍽️</span>}
-                          <span className="text-sm font-medium">{message.type === 'user' ? 'You' : 'ChefGPT'}</span>
-                        </div>
-                        <div className={`whitespace-pre-wrap ${message.isError ? 'text-red-600' : 'text-gray-700'}`}>
-                          {message.content.split(/(\*\*.*?\*\*)/g).map((part, index) =>
-                            part.startsWith('**') && part.endsWith('**')
-                              ? (<strong key={index} className="font-semibold">{part.slice(2, -2)}</strong>)
-                              : (<span key={index}>{part}</span>)
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-                {isLoading && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 text-gray-500 p-4">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>{generateThinkingMessage()}</span>
-                  </motion.div>
-                )}
-              </div>
-              <div className="border-t p-4 bg-gray-50">
-                <div className="flex gap-2 mb-4">
-                  <textarea
-                    value={currentMessage}
-                    onChange={(e) => setCurrentMessage(e.target.value)}
-                    placeholder="Type your message to ChefGPT..."
-                    className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none h-12 overflow-hidden"
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
-                  />
-                  <motion.button
-                    onClick={handleSendMessage}
-                    className="p-3 bg-blue-500 rounded-lg text-white shadow-md hover:bg-blue-600 transition-colors"
-                    whileTap={{ scale: 0.95 }}>
-                    <Send className="w-5 h-5" />
-                  </motion.button>
+      <div className="h-96 flex flex-col">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <AnimatePresence>
+            {messages.map((message) => (
+              <motion.div
+                key={message.id}
+                initial={{ opacity: 0, x: message.type === 'user' ? 20 : -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                className={`flex gap-3 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div className={`max-w-md p-4 rounded-xl ${
+                  message.type === 'user' ? 'bg-blue-100 ml-12' : 'bg-gray-100 mr-12'
+                } ${message.isError ? 'bg-red-50 border border-red-100' : ''}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    {message.type === 'ai' && <span className="text-blue-600 text-lg">🍽️</span>}
+                    <span className="text-sm font-medium">
+                      {message.type === 'user' ? 'You' : 'Auguste'}
+                    </span>
+                  </div>
+                  <div className={`whitespace-pre-wrap ${message.isError ? 'text-red-600' : 'text-gray-700'}`}>
+                    {message.content.split(/(\*\*.*?\*\*)/g).map((part, index) =>
+                      part.startsWith('**') && part.endsWith('**') ? (
+                        <strong key={index} className="font-semibold">{part.slice(2, -2)}</strong>
+                      ) : (
+                        <span key={index}>{part}</span>
+                      )
+                    )}
+                  </div>
                 </div>
-
-              </div>
-
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          
+          {isLoading && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              className="flex items-center gap-2 text-gray-500 p-4"
+            >
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>{generateThinkingMessage()}</span>
+            </motion.div>
+          )}
         </div>
 
+        <div className="border-t p-4 bg-gray-50">
+          {previewUrl && (
+            <div className="mb-4">
+              <div className="relative inline-block">
+                <img 
+                  src={previewUrl} 
+                  alt="Preview" 
+                  className="h-24 w-auto rounded-lg object-cover"
+                />
+                <button
+                  onClick={clearSelectedImage}
+                  className="absolute -top-2 -right-2 bg-white rounded-full shadow-md"
+                >
+                  <XCircle className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+              {isAnalyzing ? (
+                <div className="mt-2 text-sm text-gray-600 flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Analyzing image...
+                </div>
+              ) : imageAnalysis && (
+                <div className="mt-2 text-sm text-gray-600">
+                  Analysis: {imageAnalysis}
+                </div>
+              )}
+            </div>
+          )}
+          
+          <div className="flex gap-2">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              ref={fileInputRef}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-3 bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors"
+            >
+              <ImagePlus className="w-5 h-5" />
+            </button>
+            
+            <textarea
+              value={currentMessage}
+              onChange={(e) => setCurrentMessage(e.target.value)}
+              placeholder="Ask me about recipes or share a food photo..."
+              className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none h-12 overflow-hidden"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+            />
+            
+            <motion.button
+              onClick={handleSendMessage}
+              className="p-3 bg-blue-500 rounded-lg text-white shadow-md hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              whileTap={{ scale: 0.95 }}
+              disabled={isLoading || (!currentMessage.trim() && !imageAnalysis)}
+            >
+              <Send className="w-5 h-5" />
+            </motion.button>
+          </div>
+        </div>
+      </div>
     </motion.div>
   );
 };
