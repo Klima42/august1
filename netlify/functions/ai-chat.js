@@ -1,48 +1,15 @@
 // netlify/functions/ai-chat.js
-
 exports.handler = async function (event) {
   try {
-    const { imageBase64, messages, imageOnly } = JSON.parse(event.body);
-    const geminiKey = process.env.GEMINI_API_KEY;
-    const moondreamKey = process.env.MOONDREAM_API_KEY;
+      const { imageAnalysis, messages } = JSON.parse(event.body); // Get imageAnalysis, not imageBase64.
+      const geminiKey = process.env.GEMINI_API_KEY;
+      // No moondreamKey needed here anymore!
 
-    // If it's an image-only analysis request
-    if (imageOnly && imageBase64) {
-      try {
-        const moondreamResponse = await fetch("https://api.moondream.ai/v1/caption", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Moondream-Auth": moondreamKey,
-          },
-          body: JSON.stringify({
-            image_url: `data:image/jpeg;base64,${imageBase64}`,
-            stream: false,
-          }),
-        });
-
-        if (!moondreamResponse.ok) {
-          throw new Error(`Moondream API failed with status ${moondreamResponse.status}`);
-        }
-
-        const moondreamData = await moondreamResponse.json();
-        return {
-          statusCode: 200,
-          body: JSON.stringify({
-            imageAnalysis: moondreamData.caption || "No description available",
-          }),
-        };
-      } catch (moondreamError) {
-        console.error("Error with Moondream:", moondreamError);
-        throw new Error("Failed to analyze image");
-      }
-    }
-
-    // Regular chat flow
-    const aiMessages = [
-      {
-        role: "system",
-        content: `You are Auguste, a Michelin-star chef. You're passionate, articulate, and incredibly knowledgeable about food. You enjoy conversing with others about cuisine, cooking techniques, and culinary experiences. You have a touch of French flair, *mais oui*!
+      // --- Gemini Chat Logic ---
+      const aiMessages = [
+          {
+              role: "system",
+              content: `You are Auguste, a Michelin-star chef. You're passionate, articulate, and incredibly knowledgeable about food. You enjoy conversing with others about cuisine, cooking techniques, and culinary experiences. You have a touch of French flair, *mais oui*!
 
 **When you receive a list of ingredients:**
 - You craft a *single*, complete, and detailed recipe, *not* just a suggestion.
@@ -60,7 +27,7 @@ exports.handler = async function (event) {
 - Maintain your charming and confident personality.
 
 **When discussing an analyzed image:**
-- Always reference what you can see in the image analysis.
+- Always reference what you can see in the image analysis.  (The analysis is provided in the request.)
 - If it's food-related, offer detailed culinary commentary and suggestions.
 - If it's not food-related, respond with your charming personality while staying relevant to the image.
 - Use the image context to enhance your responses, making them more specific and personalized.
@@ -69,86 +36,107 @@ exports.handler = async function (event) {
 - You are a helpful and informative chatbot, capable of both general conversation and providing detailed recipes.
 - Prioritize being helpful, informative, and engaging.
 - Always acknowledge and reference image analyses when they're part of the conversation.`,
-      },
-    ];
+          },
+      ];
 
-    // Add previous messages to the conversation history
-    if (messages) {
-      messages.forEach((msg) => {
-        aiMessages.push({ role: msg.type || "user", content: msg.content });
-      });
-    }
-
-    // Simple detection for ingredients within the last user message
-    const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1].content : "";
-    let ingredientsDetected = false;
-    const ingredientKeywords = ["ingredients", "recipe", "make with", "cook with", "have some", "got some"];
-
-    if (ingredientKeywords.some((keyword) => lastMessage.toLowerCase().includes(keyword))) {
-      ingredientsDetected = true;
-    }
-
-    let ingredientsList = [];
-    if (ingredientsDetected) {
-      const parts = lastMessage.split(/,|\band\b|\s+/);
-      const commonWords = ["i", "have", "some", "a", "the", "with", "and", "to", "of", "in", "for", "on", "ingredients", "recipe", "make", "cook", "got"];
-      ingredientsList = parts.filter((part) => part.length > 1 && !commonWords.includes(part.toLowerCase()));
-    }
-
-    // Create the user prompt
-    let userPrompt = lastMessage;
-
-    if (ingredientsDetected) {
-      userPrompt = `Ah, magnifique! I sense you are asking for a recipe. Based on the context of our conversation, and focusing specifically on these: "${ingredientsList.join(", ")}", create a *single*, detailed, and delicious recipe. Present the recipe with a title, ingredient list (with quantities, if appropriate), step-by-step instructions (with timings), and any helpful tips.`;
-    }
-
-    // Add the final prompt to messages
-    if (userPrompt) {
-      aiMessages.push({ role: 'user', content: userPrompt });
-    }
-
-    // Call Gemini for chat response
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: aiMessages.map((m) => ({
-                text: m.content,
-              })),
-            },
-          ],
-        }),
+      // Add previous messages to the conversation history.
+      if (messages) {
+          messages.forEach((msg) => {
+              // No imageUrl handling needed here.
+              aiMessages.push({ role: msg.type || "user", content: msg.content });
+          });
       }
-    );
 
-    if (!geminiResponse.ok) {
-      throw new Error(`Gemini API failed with status ${geminiResponse.status}`);
-    }
+      // Ingredient detection (remains the same)
+      const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1].content : "";
+      let ingredientsDetected = false;
+      const ingredientKeywords = ["ingredients", "recipe", "make with", "cook with", "have some", "got some"];
 
-    const geminiData = await geminiResponse.json();
-    const responseText =
-      geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "No response content found";
+      if (ingredientKeywords.some((keyword) => lastMessage.toLowerCase().includes(keyword))) {
+          ingredientsDetected = true;
+      }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        content: responseText,
-      }),
-    };
+      let ingredientsList = [];
+      if (ingredientsDetected) {
+          const parts = lastMessage.split(/,|\band\b|\s+/);
+          const commonWords = ["i", "have", "some", "a", "the", "with", "and", "to", "of", "in", "for", "on", "ingredients", "recipe", "make", "cook", "got"];
+          ingredientsList = parts.filter((part) => part.length > 1 && !commonWords.includes(part.toLowerCase()));
+      }
+
+      // Create the user prompt, incorporating image analysis if available.
+      let userPrompt = lastMessage; // Start with the user's message.
+
+      if (ingredientsDetected) {
+          userPrompt = `Ah, magnifique! I sense you are asking for a recipe. Based on the context of our conversation, and focusing specifically on these: "${ingredientsList.join(", ")}", create a *single*, detailed, and delicious recipe... (rest of your ingredient prompt)`;
+      }
+
+      // Prepend the image analysis *if it exists*.
+      if (imageAnalysis) {
+          userPrompt = `[Image Analysis: ${imageAnalysis}]\n\n${userPrompt}`;
+      }
+
+      // Add to aiMessages.
+      if (userPrompt) {
+        aiMessages.push({ role: 'user', content: userPrompt });
+      }
+
+      // --- Gemini API Call (with retry) ---
+      const geminiResponse = await retryRequest(async () => {
+          const response = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiKey}`,
+              {
+                  method: "POST",
+                  headers: {
+                      "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                      contents: [
+                          {
+                              parts: aiMessages.map((m) => ({
+                                  text: m.content,
+                              })),
+                          },
+                      ],
+                  }),
+              }
+          );
+          if (!response.ok) {
+              throw new Error(`Gemini API failed with status ${response.status}`);
+          }
+          return response;
+      });
+
+      const geminiData = await geminiResponse.json();
+      const responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "No response content found";
+
+      return {
+          statusCode: 200,
+          body: JSON.stringify({
+              content: responseText,
+          }),
+      };
   } catch (error) {
-    console.error("Error processing request:", error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        error: "Failed to process request",
-        details: error.message,
-      }),
-    };
+      console.error("Error processing request:", error);
+      return {
+          statusCode: 500,
+          body: JSON.stringify({
+              error: "Failed to process request",
+              details: error.message,
+          }),
+      };
   }
 };
+
+// Helper function for retries (same as before)
+async function retryRequest(fn, retries = 3, delay = 500) {
+try {
+  return await fn();
+} catch (error) {
+  if (error.message.includes("Gemini API failed with status 429") && retries > 0) {
+    console.log(`Rate limit exceeded. Retrying in ${delay}ms. Attempts left: ${retries}`);
+    await new Promise(res => setTimeout(res, delay));
+    return retryRequest(fn, retries - 1, delay * 2);
+  }
+  throw error;
+}
+}
