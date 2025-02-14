@@ -9,7 +9,7 @@ const App = () => {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<homepage />} />
         <Route path="/chat" element={
           <div className="container mx-auto px-4 py-8 max-w-4xl">
             <AIChatAssistant />

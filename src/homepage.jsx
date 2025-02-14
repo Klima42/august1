@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChefHat, MessageSquare, UtensilsCrossed, ArrowRight } from 'lucide-react';
 
-const HomePage = () => {
+const homepage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFF5EB] to-[#FFF0E0]">
       {/* Hero Section */}
@@ -76,4 +76,4 @@ const HomePage = () => {
   );
 };
 
-export default HomePage;
+export default homepage;
