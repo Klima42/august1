@@ -14,7 +14,7 @@ const AIChatAssistant = () => {
   // State for conversations management
   const [conversations, setConversations] = useState({});
   const [activeConversationId, setActiveConversationId] = useState(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [conversationToDelete, setConversationToDelete] = useState(null);
   
@@ -29,6 +29,16 @@ const AIChatAssistant = () => {
   const lastRequestTime = useRef(0);
   const REQUEST_COOLDOWN = 2000;
   const fileInputRef = useRef(null);
+  const messagesEndRef = useRef(null);
+
+  // Scroll to bottom effect
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [conversations]);
 
   // Load conversations from localStorage
   useEffect(() => {
@@ -86,6 +96,7 @@ const AIChatAssistant = () => {
       [newId]: newConversation
     }));
     setActiveConversationId(newId);
+    setIsSidebarOpen(false); // Close sidebar on mobile after creating new conversation
   };
 
   const deleteConversation = (id) => {
@@ -113,6 +124,7 @@ const AIChatAssistant = () => {
     
     setShowDeleteModal(false);
     setConversationToDelete(null);
+    setIsSidebarOpen(false); // Close sidebar on mobile after deleting conversation
   };
 
   const generateThinkingMessage = () =>
@@ -255,23 +267,47 @@ const AIChatAssistant = () => {
       animate={{ opacity: 1 }}
       className="fixed inset-0 flex bg-white"
     >
-      {/* Sidebar */}
+      {/* Mobile Overlay Background */}
       <AnimatePresence>
         {isSidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar - Modified for mobile */}
+      <AnimatePresence>
+        {(isSidebarOpen || window.innerWidth >= 1024) && (
           <motion.div
             initial={{ x: -300 }}
             animate={{ x: 0 }}
             exit={{ x: -300 }}
-            className="w-72 bg-gray-50 border-r flex flex-col"
+            transition={{ type: "spring", damping: 20 }}
+            className="fixed left-0 top-0 bottom-0 w-72 bg-gray-50 border-r flex flex-col z-30 lg:relative lg:translate-x-0"
           >
             <div className="p-4 border-b flex justify-between items-center bg-white">
               <h2 className="font-semibold">Conversations</h2>
-              <button
-                onClick={createNewConversation}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
-                <Plus className="w-5 h-5 text-gray-600" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={createNewConversation}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  aria-label="New conversation"
+                >
+                  <Plus className="w-5 h-5 text-gray-600" />
+                </button>
+                <button
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg lg:hidden"
+                  aria-label="Close sidebar"
+                >
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
             </div>
             
             <div className="flex-1 overflow-y-auto">
@@ -283,7 +319,10 @@ const AIChatAssistant = () => {
                     className={`p-3 border-b cursor-pointer hover:bg-gray-100 flex items-center justify-between ${
                       conversation.id === activeConversationId ? 'bg-blue-50' : ''
                     }`}
-                    onClick={() => setActiveConversationId(conversation.id)}
+                    onClick={() => {
+                      setActiveConversationId(conversation.id);
+                      setIsSidebarOpen(false); // Close sidebar on mobile after selecting conversation
+                    }}
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <MessageSquare className="w-5 h-5 text-gray-500 flex-shrink-0" />
@@ -301,6 +340,7 @@ const AIChatAssistant = () => {
                           deleteConversation(conversation.id);
                         }}
                         className="p-1 hover:bg-gray-200 rounded"
+                        aria-label="Delete conversation"
                       >
                         <Trash2 className="w-4 h-4 text-gray-500" />
                       </button>
@@ -313,12 +353,13 @@ const AIChatAssistant = () => {
       </AnimatePresence>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col relative">
         <div className="flex items-center justify-between p-4 border-b bg-white">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-1 hover:bg-gray-100 rounded-lg"
+              aria-label="Toggle sidebar"
             >
               <Menu className="w-5 h-5 text-gray-500" />
             </button>
@@ -378,6 +419,7 @@ const AIChatAssistant = () => {
                 <span>{generateThinkingMessage()}</span>
               </motion.div>
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           <div className="border-t p-4 bg-gray-50">
@@ -398,6 +440,7 @@ const AIChatAssistant = () => {
                     <button
                       onClick={clearSelectedImage}
                       className="absolute -top-2 -right-2 bg-white rounded-full shadow-md"
+                      aria-label="Remove image"
                     >
                       <XCircle className="w-5 h-5 text-gray-600" />
                     </button>
@@ -423,6 +466,7 @@ const AIChatAssistant = () => {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="p-3 bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors"
+                aria-label="Upload image"
               >
                 <ImagePlus className="w-5 h-5" />
               </button>
@@ -445,6 +489,7 @@ const AIChatAssistant = () => {
                 className="p-3 bg-blue-500 rounded-lg text-white shadow-md hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 whileTap={{ scale: 0.95 }}
                 disabled={isLoading || (!currentMessage.trim() && !selectedImage)}
+                aria-label="Send message"
               >
                 <Send className="w-5 h-5" />
               </motion.button>
@@ -460,7 +505,7 @@ const AIChatAssistant = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
           >
             <motion.div
               initial={{ scale: 0.95 }}
