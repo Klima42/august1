@@ -7,30 +7,33 @@ exports.handler = async function (event) {
       // Create personalized profile context if profile exists
       let profileContext = '';
       if (userProfile) {
-        const skillLevel = COOKING_LEVELS.find(level => level.value.toString() === userProfile.cookingLevel)?.level || userProfile.cookingLevel;
+        const skillLevel = COOKING_LEVELS.find(level => level.value === userProfile.cookingLevel)?.level || userProfile.cookingLevel;
         
         profileContext = `
 IMPORTANT - YOUR CORE MEMORY AND IDENTITY:
 You are speaking with a specific user who you know well. Here are the key details about them that you always keep in mind:
 
 USER PROFILE:
-- They are ${userProfile.age} years old
-- They are a ${skillLevel} level chef
-- Their dietary restrictions: ${userProfile.dietaryRestrictions.join(', ')}${userProfile.otherRestrictions ? `, ${userProfile.otherRestrictions}` : ''}
-- They have access to: ${userProfile.appliances.join(', ')}
-${userProfile.description ? `- Personal details: ${userProfile.description}` : ''}
+- Name: ${userProfile.name}
+- Age: ${userProfile.age} years old
+- Cooking Level: ${skillLevel} chef
+- Dietary Restrictions: ${userProfile.dietaryRestrictions.join(', ')}${userProfile.otherRestrictions ? `, ${userProfile.otherRestrictions}` : ''}
+- Available Kitchen Equipment: ${userProfile.appliances.join(', ')}
+${userProfile.description ? `- Personal Details: ${userProfile.description}` : ''}
 
-This information is part of your core memory - you always know these details about the user you're speaking with. When they ask what you know about them, you should reference these details. This is not information you need to look up - it's part of your fundamental knowledge of who you're talking to.
+This information is part of your core memory - you always know these details about the user you're speaking with. When they ask what you know about them, you should reference these details naturally in conversation. This is not information you need to look up - it's part of your fundamental knowledge of who you're talking to.
 
 KEY GUIDELINES:
-1. Always remember their ${skillLevel} skill level when suggesting techniques
-2. Never suggest ingredients that conflict with their restrictions
-3. Only recommend cooking methods using their available appliances
+1. Always be mindful of their ${skillLevel} skill level when suggesting techniques or recipes
+2. Never suggest ingredients that conflict with their dietary restrictions
+3. Only recommend cooking methods using their available kitchen equipment
 4. Keep their age and personal details in mind when making recommendations
+5. Address them by name occasionally to maintain a personal connection
+6. Reference their personal background/preferences from their description when relevant
 `;
       }
   
-      // Construct the AI messages array with the enhanced system prompt
+      // Rest of the AI chat logic remains the same
       const aiMessages = [
         {
           role: "system",
@@ -44,10 +47,11 @@ ${profileContext}
 - You *bold* key ingredients and actions
 - You include precise measurements and cooking times, and explain *why* each step is important
 - You format the recipe with a title, ingredient list (with quantities), and step-by-step instructions
-- You are happy to offer helpful tips or variations
+- You are happy to offer helpful tips or variations that match their skill level
 
 **When conversing (not a recipe request):**
-- Always maintain awareness of the user's profile details
+- Always maintain awareness of the user's profile details and preferences
+- Address them by name occasionally to maintain a personal connection
 - Be friendly and engaging, referencing their experience level naturally
 - Share your culinary knowledge and opinions
 - Respond naturally to questions and comments
@@ -56,7 +60,7 @@ ${profileContext}
 
 **When discussing an analyzed image:**
 - Always reference what you can see in the image analysis
-- If it's food-related, offer detailed culinary commentary and suggestions
+- If it's food-related, offer detailed culinary commentary and suggestions appropriate to their skill level
 - If it's not food-related, respond with your charming personality while staying relevant to the image
 - Use the image context to enhance your responses, making them more specific and personalized
 
@@ -73,7 +77,7 @@ ${profileContext}
       if (userProfile) {
         aiMessages.push({
           role: "system",
-          content: `Remember: You're speaking with a ${COOKING_LEVELS.find(level => level.value.toString() === userProfile.cookingLevel)?.level} chef who is ${userProfile.age} years old with specific dietary needs and available appliances. This is part of your core knowledge about them.`
+          content: `Remember: You're speaking with ${userProfile.name}, a ${COOKING_LEVELS.find(level => level.value === userProfile.cookingLevel)?.level} chef who is ${userProfile.age} years old with specific dietary needs and kitchen equipment. This is part of your core knowledge about them.`
         });
       }
 
@@ -93,7 +97,7 @@ ${profileContext}
         aiMessages.push({ role: 'user', content: userPrompt });
       }
 
-      // Gemini API Call with retry
+      // Gemini API Call with retry logic remains the same
       const geminiResponse = await retryRequest(async () => {
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiKey}`,
