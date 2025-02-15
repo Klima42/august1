@@ -1,3 +1,4 @@
+// src/main.jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
@@ -5,10 +6,12 @@ import Homepage from './homepage';
 import AIChatAssistant from './AIChatAssistant';
 import DeepChef from './deepchef';
 import ProfileCreation from './ProfileCreation';
+import NavigationMenu from './components/NavigationMenu';
 
 const App = () => {
   return (
     <BrowserRouter>
+      <NavigationMenu />
       <Routes>
         <Route path="/" element={<Homepage />} />
         <Route path="/chat" element={
