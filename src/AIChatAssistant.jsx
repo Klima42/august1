@@ -44,6 +44,7 @@ const AIChatAssistant = () => {
   useEffect(() => {
     const storedConversations = localStorage.getItem('conversations');
     const storedActiveId = localStorage.getItem('activeConversationId');
+    const userProfile = localStorage.getItem('userProfile');
     
     if (storedConversations) {
       setConversations(JSON.parse(storedConversations));
@@ -51,14 +52,22 @@ const AIChatAssistant = () => {
         setActiveConversationId(storedActiveId);
       }
     } else {
-      // Create initial conversation
+      // Create initial conversation with personalized welcome message
+      let welcomeMessage = "**Bonjour!** I'm excited to help you with your culinary journey! Feel free to ask me about recipes, cooking techniques, or share food photos for analysis.";
+      
+      if (userProfile) {
+        const profile = JSON.parse(userProfile);
+        const skillLevel = profile.cookingLevel ? `level ${profile.cookingLevel}` : '';
+        welcomeMessage = `**Bonjour!** I see you're a ${skillLevel} chef${profile.dietaryRestrictions?.length ? ' with some dietary preferences' : ''}. I'm excited to help you with personalized recipes and cooking advice! Feel free to ask me anything about cooking, or share food photos for analysis.`;
+      }
+
       const initialConversation = {
         id: 'welcome',
         title: 'Welcome',
         messages: [{
           id: 'welcome',
           type: 'ai',
-          content: `**Bonjour! I'm Auguste** 🍽️ - Your culinary assistant\n\nI can help with creating detailed recipes, analyzing food photos, and answering cooking questions. Feel free to share images or ask about any culinary topic!`
+          content: welcomeMessage
         }],
         createdAt: Date.now(),
         lastUpdated: Date.now()
@@ -79,13 +88,22 @@ const AIChatAssistant = () => {
 
   const createNewConversation = () => {
     const newId = `conv-${Date.now()}`;
+    const userProfile = localStorage.getItem('userProfile');
+    let welcomeMessage = "**Bonjour!** What can I help you with today?";
+    
+    if (userProfile) {
+      const profile = JSON.parse(userProfile);
+      const skillLevel = profile.cookingLevel ? `level ${profile.cookingLevel}` : '';
+      welcomeMessage = `**Bonjour!** How can I assist you with your cooking today? As a ${skillLevel} chef, I'll make sure to tailor my suggestions to your experience level and preferences.`;
+    }
+
     const newConversation = {
       id: newId,
       title: 'New Conversation',
       messages: [{
         id: 'welcome',
         type: 'ai',
-        content: `**Bonjour!** What can I help you with today?`
+        content: welcomeMessage
       }],
       createdAt: Date.now(),
       lastUpdated: Date.now()
@@ -96,7 +114,7 @@ const AIChatAssistant = () => {
       [newId]: newConversation
     }));
     setActiveConversationId(newId);
-    setIsSidebarOpen(false); // Close sidebar on mobile after creating new conversation
+    setIsSidebarOpen(false);
   };
 
   const deleteConversation = (id) => {
@@ -124,7 +142,7 @@ const AIChatAssistant = () => {
     
     setShowDeleteModal(false);
     setConversationToDelete(null);
-    setIsSidebarOpen(false); // Close sidebar on mobile after deleting conversation
+    setIsSidebarOpen(false);
   };
 
   const generateThinkingMessage = () =>
@@ -214,6 +232,7 @@ const AIChatAssistant = () => {
         body: JSON.stringify({
           messages: [...conversations[activeConversationId].messages, userMessage],
           imageAnalysis: imageAnalysis,
+          userProfile: JSON.parse(localStorage.getItem('userProfile') || 'null')
         })
       });
 
@@ -257,7 +276,6 @@ const AIChatAssistant = () => {
       }, REQUEST_COOLDOWN);
     }
   };
-
   // Get current conversation messages
   const currentMessages = activeConversationId ? conversations[activeConversationId]?.messages || [] : [];
 
@@ -321,7 +339,7 @@ const AIChatAssistant = () => {
                     }`}
                     onClick={() => {
                       setActiveConversationId(conversation.id);
-                      setIsSidebarOpen(false); // Close sidebar on mobile after selecting conversation
+                      setIsSidebarOpen(false);
                     }}
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
