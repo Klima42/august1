@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChefHat, Save, AlertCircle, Check } from 'lucide-react';
+import { ChefHat, Save, AlertCircle, Check, MessageSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const COOKING_LEVELS = [
   {
@@ -139,6 +140,7 @@ const DIETARY_RESTRICTIONS = [
 ];
 
 const ProfileCreation = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     age: "",
     dietaryRestrictions: [],
@@ -152,12 +154,14 @@ const ProfileCreation = () => {
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [isSaved, setIsSaved] = useState(false);
   const [error, setError] = useState("");
+  const [showChatButton, setShowChatButton] = useState(false);
 
   // Load saved data if exists
   useEffect(() => {
     const savedProfile = localStorage.getItem('userProfile');
     if (savedProfile) {
       setFormData(JSON.parse(savedProfile));
+      setShowChatButton(true);
     }
   }, []);
 
@@ -174,8 +178,9 @@ const ProfileCreation = () => {
     // Save to localStorage
     localStorage.setItem('userProfile', JSON.stringify(formData));
     
-    // Show success animation
+    // Show success animation and chat button
     setIsSaved(true);
+    setShowChatButton(true);
     setTimeout(() => setIsSaved(false), 2000);
   };
 
@@ -195,6 +200,10 @@ const ProfileCreation = () => {
         ? prev.appliances.filter(a => a !== appliance)
         : [...prev.appliances, appliance]
     }));
+  };
+
+  const handleStartChat = () => {
+    navigate('/chat');
   };
 
   return (
@@ -352,8 +361,26 @@ const ProfileCreation = () => {
             )}
           </AnimatePresence>
 
-          {/* Submit Button */}
-          <div className="flex justify-end">
+          {/* Submit and Chat Buttons */}
+          <div className="flex justify-end gap-4">
+            <AnimatePresence>
+              {showChatButton && (
+                <motion.button
+                  type="button"
+                  onClick={handleStartChat}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex items-center gap-2 px-6 py-3 bg-[#FFF5EB] text-[#B87333] rounded-lg border border-[#B87333] hover:bg-[#FFF0E0] transition-colors"
+                >
+                  <MessageSquare className="w-5 h-5" />
+                  Start Chatting
+                </motion.button>
+              )}
+            </AnimatePresence>
+            
             <motion.button
               type="submit"
               whileHover={{ scale: 1.02 }}
