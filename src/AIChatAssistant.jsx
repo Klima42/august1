@@ -283,7 +283,7 @@ const AIChatAssistant = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="fixed inset-0 flex bg-white"
+      className="fixed inset-0 flex bg-gradient-to-b from-[#FFF5EB] to-[#FFF0E0]"
     >
       {/* Mobile Overlay Background */}
       <AnimatePresence>
@@ -298,7 +298,7 @@ const AIChatAssistant = () => {
         )}
       </AnimatePresence>
 
-      {/* Sidebar - Modified for mobile */}
+      {/* Sidebar - Warmer styling */}
       <AnimatePresence>
         {(isSidebarOpen || window.innerWidth >= 1024) && (
           <motion.div
@@ -306,24 +306,24 @@ const AIChatAssistant = () => {
             animate={{ x: 0 }}
             exit={{ x: -300 }}
             transition={{ type: "spring", damping: 20 }}
-            className="fixed left-0 top-0 bottom-0 w-72 bg-gray-50 border-r flex flex-col z-30 lg:relative lg:translate-x-0"
+            className="fixed left-0 top-0 bottom-0 w-72 bg-white border-r border-[#E5D3B3] flex flex-col z-30 lg:relative lg:translate-x-0"
           >
-            <div className="p-4 border-b flex justify-between items-center bg-white">
-              <h2 className="font-semibold">Conversations</h2>
+            <div className="p-4 border-b border-[#E5D3B3] flex justify-between items-center bg-[#FFF5EB]">
+              <h2 className="font-semibold text-gray-800">Conversations</h2>
               <div className="flex items-center gap-2">
                 <button
                   onClick={createNewConversation}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  className="p-2 hover:bg-[#FFF0E0] rounded-lg transition-colors"
                   aria-label="New conversation"
                 >
-                  <Plus className="w-5 h-5 text-gray-600" />
+                  <Plus className="w-5 h-5 text-[#B87333]" />
                 </button>
                 <button
                   onClick={() => setIsSidebarOpen(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg lg:hidden"
+                  className="p-2 hover:bg-[#FFF0E0] rounded-lg lg:hidden transition-colors"
                   aria-label="Close sidebar"
                 >
-                  <X className="w-5 h-5 text-gray-600" />
+                  <X className="w-5 h-5 text-[#B87333]" />
                 </button>
               </div>
             </div>
@@ -334,8 +334,8 @@ const AIChatAssistant = () => {
                 .map(conversation => (
                   <div
                     key={conversation.id}
-                    className={`p-3 border-b cursor-pointer hover:bg-gray-100 flex items-center justify-between ${
-                      conversation.id === activeConversationId ? 'bg-blue-50' : ''
+                    className={`p-3 border-b border-[#E5D3B3] cursor-pointer hover:bg-[#FFF5EB] flex items-center justify-between transition-colors ${
+                      conversation.id === activeConversationId ? 'bg-[#FFF0E0]' : ''
                     }`}
                     onClick={() => {
                       setActiveConversationId(conversation.id);
@@ -343,10 +343,10 @@ const AIChatAssistant = () => {
                     }}
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <MessageSquare className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                      <MessageSquare className="w-5 h-5 text-[#B87333] flex-shrink-0" />
                       <div className="truncate">
-                        <div className="font-medium truncate">{conversation.title}</div>
-                        <div className="text-sm text-gray-500 truncate">
+                        <div className="font-medium text-gray-800 truncate">{conversation.title}</div>
+                        <div className="text-sm text-gray-600 truncate">
                           {conversation.messages[conversation.messages.length - 1]?.content.slice(0, 30)}...
                         </div>
                       </div>
@@ -357,10 +357,10 @@ const AIChatAssistant = () => {
                           e.stopPropagation();
                           deleteConversation(conversation.id);
                         }}
-                        className="p-1 hover:bg-gray-200 rounded"
+                        className="p-1 hover:bg-[#FFF0E0] rounded transition-colors"
                         aria-label="Delete conversation"
                       >
-                        <Trash2 className="w-4 h-4 text-gray-500" />
+                        <Trash2 className="w-4 h-4 text-[#B87333]" />
                       </button>
                     )}
                   </div>
@@ -372,17 +372,17 @@ const AIChatAssistant = () => {
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col relative">
-        <div className="flex items-center justify-between p-4 border-b bg-white">
+        <div className="flex items-center justify-between p-4 border-b border-[#E5D3B3] bg-white">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-1 hover:bg-gray-100 rounded-lg"
+              className="p-1 hover:bg-[#FFF5EB] rounded-lg transition-colors"
               aria-label="Toggle sidebar"
             >
-              <Menu className="w-5 h-5 text-gray-500" />
+              <Menu className="w-5 h-5 text-[#B87333]" />
             </button>
-            <span className="text-blue-600 text-xl">🍽️</span>
-            <h3 className="font-semibold">Auguste - Your Culinary AI</h3>
+            <span className="text-[#B87333] text-xl">👨‍🍳</span>
+            <h3 className="font-semibold text-gray-800">Auguste - Your Culinary AI</h3>
           </div>
         </div>
 
@@ -401,22 +401,24 @@ const AIChatAssistant = () => {
                     <img
                       src={message.imageUrl}
                       alt="User uploaded"
-                      className="max-h-24 w-auto rounded-lg object-cover self-end"
+                      className="max-h-24 w-auto rounded-lg object-cover self-end shadow-md"
                     />
                   )}
-                  <div className={`max-w-2xl p-4 rounded-xl ${
-                    message.type === 'user' ? 'bg-blue-100 ml-12' : 'bg-gray-100 mr-12'
-                  } ${message.isError ? 'bg-red-50 border border-red-100' : ''}`}>
+                  <div className={`max-w-2xl p-4 rounded-xl shadow-sm ${
+                    message.type === 'user' 
+                      ? 'bg-white border border-[#E5D3B3] ml-12' 
+                      : 'bg-[#FFF5EB] border border-[#E5D3B3] mr-12'
+                  } ${message.isError ? 'bg-red-50 border border-red-200' : ''}`}>
                     <div className="flex items-center gap-2 mb-2">
-                      {message.type === 'ai' && <span className="text-blue-600 text-lg">🍽️</span>}
-                      <span className="text-sm font-medium">
+                      {message.type === 'ai' && <span className="text-[#B87333] text-lg">👨‍🍳</span>}
+                      <span className="text-sm font-medium text-gray-800">
                         {message.type === 'user' ? 'You' : 'Auguste'}
                       </span>
                     </div>
                     <div className={`whitespace-pre-wrap ${message.isError ? 'text-red-600' : 'text-gray-700'}`}>
                       {message.content.split(/(\*\*.*?\*\*)/g).map((part, index) =>
                         part.startsWith('**') && part.endsWith('**') ? (
-                          <strong key={index} className="font-semibold">{part.slice(2, -2)}</strong>
+                          <strong key={index} className="font-semibold text-[#B87333]">{part.slice(2, -2)}</strong>
                         ) : (
                           <span key={index}>{part}</span>
                         )
@@ -431,16 +433,16 @@ const AIChatAssistant = () => {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex items-center gap-2 text-gray-500 p-4"
+                className="flex items-center gap-2 text-gray-600 p-4"
               >
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin text-[#B87333]" />
                 <span>{generateThinkingMessage()}</span>
               </motion.div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="border-t p-4 bg-gray-50">
+          <div className="border-t border-[#E5D3B3] p-4 bg-white">
             {previewUrl && (
               <AnimatePresence>
                 <motion.div 
@@ -453,19 +455,19 @@ const AIChatAssistant = () => {
                     <img
                       src={previewUrl}
                       alt="Preview"
-                      className="h-24 w-auto rounded-lg object-cover"
+                      className="h-24 w-auto rounded-lg object-cover shadow-md"
                     />
                     <button
                       onClick={clearSelectedImage}
-                      className="absolute -top-2 -right-2 bg-white rounded-full shadow-md"
+                      className="absolute -top-2 -right-2 bg-white rounded-full shadow-md hover:bg-[#FFF5EB] transition-colors"
                       aria-label="Remove image"
                     >
-                      <XCircle className="w-5 h-5 text-gray-600" />
+                      <XCircle className="w-5 h-5 text-[#B87333]" />
                     </button>
                   </div>
                   {isAnalyzing && (
                     <div className="mt-2 text-sm text-gray-600 flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin text-[#B87333]" />
                       Analyzing image...
                     </div>
                   )}
@@ -483,7 +485,7 @@ const AIChatAssistant = () => {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="p-3 bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors"
+                className="p-3 bg-[#FFF5EB] rounded-lg text-[#B87333] hover:bg-[#FFF0E0] transition-colors"
                 aria-label="Upload image"
               >
                 <ImagePlus className="w-5 h-5" />
@@ -493,7 +495,7 @@ const AIChatAssistant = () => {
                 value={currentMessage}
                 onChange={(e) => setCurrentMessage(e.target.value)}
                 placeholder="Ask me about recipes or share a food photo..."
-                className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none h-12 overflow-hidden"
+                className="flex-1 p-3 border border-[#E5D3B3] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B87333] transition-all resize-none h-12 overflow-hidden"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -504,7 +506,7 @@ const AIChatAssistant = () => {
 
               <motion.button
                 onClick={handleSendMessage}
-                className="p-3 bg-blue-500 rounded-lg text-white shadow-md hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-3 bg-[#B87333] rounded-lg text-white shadow-md hover:bg-[#A66323] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 whileTap={{ scale: 0.95 }}
                 disabled={isLoading || (!currentMessage.trim() && !selectedImage)}
                 aria-label="Send message"
@@ -516,7 +518,7 @@ const AIChatAssistant = () => {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal - Warmer styling */}
       <AnimatePresence>
         {showDeleteModal && (
           <motion.div
@@ -529,20 +531,20 @@ const AIChatAssistant = () => {
               initial={{ scale: 0.95 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.95 }}
-              className="bg-white rounded-lg p-6 max-w-sm w-full"
+              className="bg-white rounded-lg p-6 max-w-sm w-full border border-[#E5D3B3]"
             >
-              <h3 className="text-lg font-semibold mb-2">Delete Conversation</h3>
+              <h3 className="text-lg font-semibold mb-2 text-gray-800">Delete Conversation</h3>
               <p className="text-gray-600 mb-4">Are you sure you want to delete this conversation? This action cannot be undone.</p>
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setShowDeleteModal(false)}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                  className="px-4 py-2 text-gray-600 hover:bg-[#FFF5EB] rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDelete}
-                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                 >
                   Delete
                 </button>
