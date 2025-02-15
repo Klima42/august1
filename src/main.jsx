@@ -1,9 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Homepage from './Homepage';
+import Homepage from './homepage';
 import AIChatAssistant from './AIChatAssistant';
 import DeepChef from './deepchef';
+import ProfileCreation from './ProfileCreation';
 
 const App = () => {
   return (
@@ -20,6 +21,7 @@ const App = () => {
             <DeepChef />
           </div>
         } />
+        <Route path="/profile" element={<ProfileCreation />} />
       </Routes>
     </BrowserRouter>
   );
