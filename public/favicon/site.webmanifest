@@ -1,6 +1,6 @@
 {
-  "name": "MyWebSite",
-  "short_name": "MySite",
+  "name": "Auguste - AI Cooking assistant",
+  "short_name": "Auguste",
   "icons": [
     {
       "src": "/https://deep-chef.netlify.app/favicon.ico/web-app-manifest-192x192.png",
