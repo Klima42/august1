@@ -10,3 +10,16 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+[[headers]]
+  for = "/favicon/site.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Access-Control-Allow-Origin = "*"
+
+[dev]
+  command = "npm run dev"
+  targetPort = 5173
+  port = 8888
+  publish = "dist"
+  autoLaunch = true
