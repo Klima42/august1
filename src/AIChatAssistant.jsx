@@ -257,18 +257,29 @@ const AIChatAssistant = () => {
       animate={{ opacity: 1 }}
       className="fixed inset-0 flex bg-gradient-to-b from-[#FFF5EB] to-[#FFF0E0]"
     >
-      {/* Mobile Overlay Background */}
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-        )}
-      </AnimatePresence>
+      {/* Mobile Overlay Background with Button */}
+<AnimatePresence>
+  {isSidebarOpen && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden flex"
+      onClick={() => setIsSidebarOpen(false)}
+    >
+      {/* Right side button area */}
+      <div className="ml-72 flex-1 flex items-center justify-center">
+        <button 
+          onClick={() => setIsSidebarOpen(false)}
+          className="bg-white bg-opacity-20 hover:bg-opacity-30 transition-all duration-200 rounded-lg py-2 px-4 flex items-center gap-2 text-sm"
+        >
+          <X className="w-4 h-4 text-white" />
+          <span className="text-white font-medium">Close</span>
+        </button>
+      </div>
+    </motion.div>
+  )}
+</AnimatePresence>
 
       {/* Sidebar with profile info and conversations */}
       <AnimatePresence>
