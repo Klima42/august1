@@ -1,13 +1,43 @@
-// src/components/NavigationMenu.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, Home, MessageSquare, ChefHat, UserCircle } from 'lucide-react';
+
+// 1. Import your Supabase client
+import { supabase } from '../lib/supabase'; // Adjust the relative path as needed
 
 const NavigationMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // 2. State to store test query result
+  const [testResult, setTestResult] = useState(null);
+
+  // 3. Run a test query on component mount (or at some trigger)
+  useEffect(() => {
+    async function testSupabaseConnection() {
+      try {
+        // Try selecting all rows from a known table (e.g. 'profiles')
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*');
+
+        if (error) {
+          console.error('Supabase error:', error);
+          setTestResult('Error: ' + error.message);
+        } else {
+          console.log('Supabase data:', data);
+          setTestResult(JSON.stringify(data, null, 2));
+        }
+      } catch (err) {
+        console.error('Unexpected error:', err);
+        setTestResult('Unexpected error: ' + err.message);
+      }
+    }
+
+    testSupabaseConnection();
+  }, []);
 
   const menuItems = [
     { path: '/', label: 'Home', icon: Home },
@@ -55,7 +85,7 @@ const NavigationMenu = () => {
               {menuItems.map((item, index) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
-                
+
                 return (
                   <motion.button
                     key={item.path}
@@ -74,6 +104,14 @@ const NavigationMenu = () => {
           </>
         )}
       </AnimatePresence>
+
+      {/* Just for demonstration: show the result of our test query */}
+      {testResult && (
+        <div className="absolute bottom-0 left-0 m-4 p-2 bg-white shadow-md rounded-lg w-64 text-sm text-gray-800 max-h-48 overflow-auto">
+          <strong>Test Query Result:</strong>
+          <pre>{testResult}</pre>
+        </div>
+      )}
     </div>
   );
 };
