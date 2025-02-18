@@ -7,6 +7,32 @@ import AIChatAssistant from './AIChatAssistant';
 import DeepChef from './deepchef';
 import ProfileCreation from './ProfileCreation';
 import NavigationMenu from './components/NavigationMenu';
+import { supabase } from './lib/supabase';
+
+
+export default function TestConnection() {
+  useEffect(() => {
+    async function fetchData() {
+      const { data, error } = await supabase
+        .from('profiles')       // or any table defined in your SQL
+        .select('*');
+
+      if (error) {
+        console.error('Supabase Error:', error);
+      } else {
+        console.log('Supabase Data:', data);
+      }
+    }
+    fetchData();
+  }, []);
+
+  return (
+    <div>
+      <h1>Testing Supabase Connection</h1>
+      <p>Open your console to see the results.</p>
+    </div>
+  );
+}
 
 const App = () => {
   return (
