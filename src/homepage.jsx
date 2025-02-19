@@ -2,7 +2,10 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChefHat, MessageSquare, UtensilsCrossed, ArrowRight, UserCircle } from 'lucide-react';
 
-const homepage = () => {
+// Import your component that automatically saves localStorage data to Supabase
+import SaveLocalStorageToSupabase from './components/SaveLocalStorageToSupabase';
+
+function homepage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FFF5EB] to-[#FFF0E0]">
       {/* Hero Section */}
@@ -29,7 +32,8 @@ const homepage = () => {
                 <h2 className="text-2xl font-semibold text-gray-800">Chat with Auguste</h2>
               </div>
               <p className="text-gray-600 mb-6">
-                Engage in conversations with your personal Michelin-starred AI chef. Get cooking tips, recipe ideas, and culinary guidance.
+                Engage in conversations with your personal Michelin-starred AI chef. 
+                Get cooking tips, recipe ideas, and culinary guidance.
               </p>
               <div className="flex items-center text-[#B87333] group-hover:translate-x-2 transition-transform">
                 <span className="font-medium">Start Chatting</span>
@@ -63,7 +67,8 @@ const homepage = () => {
                 <h2 className="text-2xl font-semibold text-gray-800">Create Profile</h2>
               </div>
               <p className="text-gray-600 mb-6">
-                Set up your cooking profile with dietary preferences, skill level, and kitchen equipment for personalized recommendations.
+                Set up your cooking profile with dietary preferences, skill level, 
+                and kitchen equipment for personalized recommendations.
               </p>
               <div className="flex items-center text-[#B87333] group-hover:translate-x-2 transition-transform">
                 <span className="font-medium">Customize Experience</span>
@@ -76,21 +81,39 @@ const homepage = () => {
         {/* Bottom Feature Highlights */}
         <div className="mt-24 grid md:grid-cols-3 gap-8 max-w-4xl mx-auto text-center">
           <div className="p-6">
-            <h3 className="font-semibold text-lg mb-2 text-gray-800">Professional Expertise</h3>
-            <p className="text-gray-600">Access Michelin-star level culinary knowledge and techniques</p>
+            <h3 className="font-semibold text-lg mb-2 text-gray-800">
+              Professional Expertise
+            </h3>
+            <p className="text-gray-600">
+              Access Michelin-star level culinary knowledge and techniques
+            </p>
           </div>
           <div className="p-6">
-            <h3 className="font-semibold text-lg mb-2 text-gray-800">Image Recognition</h3>
-            <p className="text-gray-600">Upload photos of ingredients for instant recipe suggestions</p>
+            <h3 className="font-semibold text-lg mb-2 text-gray-800">
+              Image Recognition
+            </h3>
+            <p className="text-gray-600">
+              Upload photos of ingredients for instant recipe suggestions
+            </p>
           </div>
           <div className="p-6">
-            <h3 className="font-semibold text-lg mb-2 text-gray-800">Personalized Recipes</h3>
-            <p className="text-gray-600">Get custom recipes based on your available ingredients</p>
+            <h3 className="font-semibold text-lg mb-2 text-gray-800">
+              Personalized Recipes
+            </h3>
+            <p className="text-gray-600">
+              Get custom recipes based on your available ingredients
+            </p>
           </div>
         </div>
       </div>
+
+      {/* 
+        Calls the component that automatically saves localStorage data to Supabase.
+        Make sure you have "SaveLocalStorageToSupabase.jsx" in your /components folder.
+      */}
+      <SaveLocalStorageToSupabase />
     </div>
   );
-};
+}
 
 export default homepage;
